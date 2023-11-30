@@ -1,2 +1,2 @@
 # cofnet
-net tools
+python3 net tools
