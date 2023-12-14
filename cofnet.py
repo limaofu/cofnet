@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # coding=utf-8
 # author: Cof-Lee
-# update: 2023-11-30
+# update: 2023-12-14
 # module name: cofnet
 # 本模块使用cof-lee开源协议 v1.0
 # 所有条款及内容如下：
@@ -109,6 +109,23 @@ def is_ip_range(input_str):
         return True
     else:
         return False
+
+
+def is_ip_range_2(input_str):
+    # 判断 输入字符串 是否为 ip地址范围，返回bool值，是则返回True，否则返回False
+    # 输入 "10.99.1.33-10.99.1.55" 输出 True
+    # 输入 "10.99.1.22-10.99.1.10" 输出 False ，不是正确的地址范围，首ip大于了尾ip
+    # input <str> , output <bool>
+    input_seg = input_str.split("-")
+    seg1_list = input_seg[0].split(".")
+    seg2_list = input_seg[1].split(".")
+    if len(seg1_list) != 4:
+        return False
+    if len(seg2_list) != 4:
+        return False
+    if ip_mask_to_int(input_seg[0]) > ip_mask_to_int(input_seg[1]):
+        return False
+    return True
 
 
 def maskint_to_maskbyte(maskint):
@@ -223,6 +240,15 @@ def get_netseg_byte(ip, maskintorbyte):
     # 依赖上面的2个函数:  get_netseg_int() 以及 int32_to_ip()
     # input <str,int/str> , output <str>
     return int32_to_ip(get_netseg_int(ip, maskintorbyte))
+
+
+def get_netseg_byte_c(cidr):
+    # 根据 cidr 获 取ip地址的 网段（byte值），子网掩码可为int型或byte型，例如：
+    # 输入 "10.99.1.1/24"     输出 10.99.1.0
+    # 依赖上面的2个函数:  get_netseg_int() 以及 int32_to_ip()
+    # input <str> , output <str>
+    ip_mask_seg = cidr.split("/")
+    return int32_to_ip(get_netseg_int(ip_mask_seg[0], ip_mask_seg[1]))
 
 
 def is_ip_in_cidr(ip, cidr):
