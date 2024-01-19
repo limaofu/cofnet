@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 # coding=utf-8
-# author: Cof-Lee
-# update: 2023-12-14
 # module name: cofnet
-# 本模块使用cof-lee开源协议 v1.0
-# 所有条款及内容如下：
-# （1）无担保：作者不保证源代码内容的准确无误，亦不承担由于使用此源代码所导致的任何后果
-# （2）自由使用：任何人可以出于任何目的而自由地 阅读/链接/打印/转载/引用/分发/再创作 此源代码，无需任何附加条件
+# author: Cof-Lee
+# update: 2024-01-19
+# 本模块使用GPL-3.0开源协议
 
 """
 术语解析:
@@ -17,7 +14,18 @@ netseg     网段，如 10.1.0.0 ，不含掩码               类型: str
 cidr       地址块，网段及掩码位数 ，如 10.1.0.0/16        类型: str
 """
 
+import struct
+import time
+import threading
+import socket
+import random
+import uuid
+import array
 
+import paramiko
+
+
+# #################################  start of module's function  ##############################
 def is_ip_addr(input_str):
     # 判断 输入字符串 是否为 ip地址，返回bool值，是则返回True，否则返回False
     # input <str> , output <bool>
@@ -117,6 +125,8 @@ def is_ip_range_2(input_str):
     # 输入 "10.99.1.22-10.99.1.10" 输出 False ，不是正确的地址范围，首ip大于了尾ip
     # input <str> , output <bool>
     input_seg = input_str.split("-")
+    if len(input_seg) != 2:
+        return False
     seg1_list = input_seg[0].split(".")
     seg2_list = input_seg[1].split(".")
     if len(seg1_list) != 4:
@@ -307,7 +317,127 @@ def is_ip_in_range(targetip, start_ip, end_ip):
         return False
 
 
-# #################################  end of module's function  ##############################
+def icmp_checksum(packet):
+    # 计算icmp报文的校验和
+    # input <bytes/bytearray> , output <int>
+    if len(packet) & 1:  # 长度的末位为1表示：长度不为2的倍数（即末位不为0）
+        packet = packet + b'\x00'  # 0填充
+    words = array.array('h', packet)
+    checksum = 0
+    for word in words:
+        checksum += (word & 0xffff)
+    while checksum > 0xFFFF:
+        checksum = (checksum >> 16) + (checksum & 0xffff)
+    return (~checksum) & 0xffff  # 反回2字节校验和的反码
 
+
+# #################################  end of module's function  ##############################
+#
+#
+# #################################  start of module's class  ##############################
+
+class IcmpDetector:
+    def __init__(self, dest_ip='undefined', icmp_data='data', source_ip='undefined', icmp_type=8, icmp_code=0,
+                 probe_count=3, interval=3, timeout=3):
+        self.id = uuid.uuid4().__str__()  # <str>
+        self.dest_ip = dest_ip
+        self.icmp_data = icmp_data.encode('utf8')
+        self.source_ip = source_ip
+        self.icmp_type = icmp_type
+        self.icmp_code = icmp_code
+        self.icmp_id = random.randint(0, 0xFFFF)
+        self.icmp_sequence = random.randint(0, 0xFFFF)
+        self.icmp_checkum = 0x0000  # 生成icmp_packet报文后，icmp_checksum也更新了
+        self.probe_count = probe_count
+        self.interval = interval
+        self.timeout = timeout
+        self.icmp_packet = self.generate_icmp_packet()  # 生成icmp报文后，上面的icmp_checksum也更新了
+        self.icmp_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.getprotobyname("icmp"))
+        self.probe_result_list = []
+        return
+
+    def generate_icmp_packet(self):
+        icmp_checkum = 0x0000
+        icmp_header = struct.pack('BBHHH', self.icmp_type, self.icmp_code, icmp_checkum, self.icmp_id,
+                                  self.icmp_sequence)
+        icmp_packet = icmp_header + self.icmp_data
+        icmp_checkum = cofnet.icmp_checksum(icmp_packet)
+        self.icmp_checkum = icmp_checkum
+        icmp_header = struct.pack('BBHHH', self.icmp_type, self.icmp_code, icmp_checkum, self.icmp_id,
+                                  self.icmp_sequence)
+        return icmp_header + self.icmp_data
+
+    def recv_icmp_packet(self):
+        time_start = time.time()
+        try:
+            recv_packet, addr = self.icmp_socket.recvfrom(1500)
+        except Exception as e:
+            if isinstance(e, TimeoutError):
+                print(f'timeout')
+            else:
+                print(f"Exception: {type(e)}")
+            return
+        icmp_type, icmp_code, icmp_checkum, recv_id, icmp_sequence = struct.unpack("BBHHH", recv_packet[20:28])
+        time_end = time.time()
+        time_used = (time_end - time_start) * 1000
+        if recv_id == self.icmp_id and icmp_sequence == self.icmp_sequence:
+            ttl = struct.unpack("!BBHHHBBHII", recv_packet[:20])[5]
+            print("目标回复: {}  ttl: {}，耗时: {:<7.2f} 毫秒".format(addr[0], ttl, time_used))
+            self.probe_result_list.append({"time_start": time_start, "time_end": time_end, "time_used": time_used})
+        return
+
+    def run(self):
+        self.icmp_socket.settimeout(self.timeout)  # 设置超时，单位，秒
+        probe_thread_list = []
+        for probe_index in range(self.probe_count):
+            probe_thread = threading.Thread(target=self.recv_icmp_packet, )  # 创建子线程
+            probe_thread.start()
+            self.icmp_socket.sendto(self.icmp_packet, (self.dest_ip, 0))
+            probe_thread_list.append(probe_thread)
+            time.sleep(self.interval)
+        for probe_thread in probe_thread_list:
+            probe_thread.join()
+        self.icmp_socket.close()
+
+
+class SSHCommander:
+    def __init__(self, hostname='localhost', username='default', password='default', port=22, timeout=30,
+                 auth_method='password', command_list=None):
+        self.id = uuid.uuid4().__str__()  # <str>
+        self.hostname = hostname
+        self.username = username
+        self.password = password
+        self.port = port
+        self.timeout = timeout  # 单位:秒
+        self.auth_method = auth_method
+        self.command_list = command_list
+        self.output_list = []
+
+    def run(self):
+        client1 = paramiko.client.SSHClient()
+        client1.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # 允许连接不在know_hosts文件里的主机
+        try:
+            client1.connect(hostname=self.hostname, port=self.port, username=self.username, password=self.password,
+                            timeout=self.timeout)
+        except paramiko.AuthenticationException as e:
+            print(f"Authentication Error: {e}")
+            exit()
+        client1_shell = client1.invoke_shell()  # 创建一个交互式shell
+        index = 0
+        for line in self.command_list:  # 解析输入
+            if line == "\n":  # 如果是空行，则不执行此空命令
+                continue
+            # print(f"执行命令{index} : {line.strip()}")
+            client1_shell.send(line.encode('utf8'))  # 交互式shell可多次执行命令而不断开连接
+            time.sleep(1)
+            index += 1
+            output = client1_shell.recv(65535).decode('utf8')
+            self.output_list.append(output)
+            # print(f"输出结果:\n{output}")
+        client1_shell.close()
+        client1.close()
+
+
+# #################################  end of module's class  ##############################
 if __name__ == '__main__':
     print("this is cofnet.py")
