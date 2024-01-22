@@ -2,7 +2,7 @@
 # coding=utf-8
 # module name: cofnet
 # author: Cof-Lee
-# update: 2024-01-19
+# update: 2024-01-22
 # 本模块使用GPL-3.0开源协议
 
 """
@@ -23,6 +23,11 @@ import uuid
 import array
 
 import paramiko
+
+# 全局常量
+CODE_POST_WAIT_TIME_DEFAULT = 0.1  # 命令发送后等待的时间，秒
+CODE_EXEC_METHOD_INVOKE_SHELL = 0
+CODE_EXEC_METHOD_EXEC_COMMAND = 0
 
 
 # #################################  start of module's function  ##############################
@@ -361,7 +366,7 @@ class IcmpDetector:
         icmp_header = struct.pack('BBHHH', self.icmp_type, self.icmp_code, icmp_checkum, self.icmp_id,
                                   self.icmp_sequence)
         icmp_packet = icmp_header + self.icmp_data
-        icmp_checkum = cofnet.icmp_checksum(icmp_packet)
+        icmp_checkum = icmp_checksum(icmp_packet)
         self.icmp_checkum = icmp_checkum
         icmp_header = struct.pack('BBHHH', self.icmp_type, self.icmp_code, icmp_checkum, self.icmp_id,
                                   self.icmp_sequence)
@@ -392,7 +397,10 @@ class IcmpDetector:
         for probe_index in range(self.probe_count):
             probe_thread = threading.Thread(target=self.recv_icmp_packet, )  # 创建子线程
             probe_thread.start()
-            self.icmp_socket.sendto(self.icmp_packet, (self.dest_ip, 0))
+            try:
+                self.icmp_socket.sendto(self.icmp_packet, (self.dest_ip, 0))
+            except Exception as e:
+                raise e
             probe_thread_list.append(probe_thread)
             time.sleep(self.interval)
         for probe_thread in probe_thread_list:
@@ -400,7 +408,31 @@ class IcmpDetector:
         self.icmp_socket.close()
 
 
-class SSHCommander:
+class OneLineCode:
+    def __init__(self, code_index=0, code_content='', code_post_wait_time=CODE_POST_WAIT_TIME_DEFAULT,
+                 need_interactive=False, interactive_question='', interactive_answer=''):
+        self.code_index = code_index
+        self.code_content = code_content
+        self.code_post_wait_time = code_post_wait_time
+        self.need_interactive = need_interactive
+        self.interactive_question = interactive_question
+        self.interactive_answer = interactive_answer
+
+
+class SSHOperatorOutput:
+    def __init__(self, code_index=0, code_content=None, code_exec_method=CODE_EXEC_METHOD_INVOKE_SHELL,
+                 invoke_shell_output_str=None, is_empty_output=False, exec_command_stdout_line_list=None,
+                 exec_command_stderr_line_list=None):
+        self.code_index = code_index
+        self.code_content = code_content
+        self.code_exec_method = code_exec_method
+        self.invoke_shell_output_str = invoke_shell_output_str
+        self.exec_command_stdout_line_list = exec_command_stdout_line_list
+        self.exec_command_stderr_line_list = exec_command_stderr_line_list
+        self.is_empty_output = is_empty_output
+
+
+class SSHOperator:
     def __init__(self, hostname='localhost', username='default', password='default', port=22, timeout=30,
                  auth_method='password', command_list=None):
         self.id = uuid.uuid4().__str__()  # <str>
@@ -410,32 +442,99 @@ class SSHCommander:
         self.port = port
         self.timeout = timeout  # 单位:秒
         self.auth_method = auth_method
-        self.command_list = command_list
-        self.output_list = []
+        self.command_list = command_list  # 元素为 <OneLineCode>对象
+        self.is_finished = False  # False表示命令未执行完成
+        self.output_list = []  # 元素类型为 <SSHOperatorOutput>
 
-    def run(self):
-        client1 = paramiko.client.SSHClient()
-        client1.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # 允许连接不在know_hosts文件里的主机
+    def run_invoke_shell(self):
+        if self.command_list is None:
+            return None
+        ssh_client = paramiko.client.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # 允许连接host_key不在know_hosts文件里的主机
         try:
-            client1.connect(hostname=self.hostname, port=self.port, username=self.username, password=self.password,
-                            timeout=self.timeout)
+            ssh_client.connect(hostname=self.hostname, port=self.port, username=self.username, password=self.password,
+                               timeout=self.timeout)
         except paramiko.AuthenticationException as e:
             print(f"Authentication Error: {e}")
-            exit()
-        client1_shell = client1.invoke_shell()  # 创建一个交互式shell
-        index = 0
-        for line in self.command_list:  # 解析输入
-            if line == "\n":  # 如果是空行，则不执行此空命令
-                continue
-            # print(f"执行命令{index} : {line.strip()}")
-            client1_shell.send(line.encode('utf8'))  # 交互式shell可多次执行命令而不断开连接
-            time.sleep(1)
-            index += 1
-            output = client1_shell.recv(65535).decode('utf8')
+            return None
+        ssh_shell = ssh_client.invoke_shell()  # 创建一个交互式shell
+        # ssh_shell.settimeout(0) 等价于 ssh_shell.setblocking(False)，默认为True
+        try:
+            recv = ssh_shell.recv(65535)
+        except Exception as e:
+            print(e)
+            return
+        output = SSHOperatorOutput(code_index=-1, code_exec_method=CODE_EXEC_METHOD_INVOKE_SHELL,
+                                   invoke_shell_output_str=recv.decode('utf8'))
+        self.output_list.append(output)
+        print("登录后输出内容如下 #############################################")
+        print(recv.decode('utf8'))
+        cmd_index = 0
+        for code in self.command_list:  # 开始执行命令
+            if not isinstance(code, OneLineCode):
+                return
+            ssh_shell.send(code.code_content.encode('utf8'))  # 每次send发送命令后，ssh_shell会变，所以每次得重新传入此shell对象到线程函数里
+            ssh_shell.send("\n".encode('utf8'))  # 命令有可能不带\n换行，需要额外发送一个换行符
+            time.sleep(code.code_post_wait_time)  # 发送完命令后，要等待系统回复
+            try:
+                recv = ssh_shell.recv(65535)
+            except Exception as e:
+                print(e)
+                return
+            output = SSHOperatorOutput(code_index=cmd_index, code_exec_method=CODE_EXEC_METHOD_INVOKE_SHELL,
+                                       code_content=code.code_content, invoke_shell_output_str=recv.decode('utf8'))
             self.output_list.append(output)
-            # print(f"输出结果:\n{output}")
-        client1_shell.close()
-        client1.close()
+            print(f"命令{cmd_index} 输出结果如下 #############################################")
+            print(recv.decode('utf8'))
+            cmd_index += 1
+        ssh_shell.close()
+        ssh_client.close()
+        self.is_finished = True
+
+    def exec_command(self):
+        if self.command_list is None:
+            return None
+        ssh_client = paramiko.client.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())  # 允许连接host_key不在know_hosts文件里的主机
+        try:
+            ssh_client.connect(hostname=self.hostname, port=self.port, username=self.username, password=self.password,
+                               timeout=self.timeout)
+        except paramiko.AuthenticationException as e:
+            print(f"Authentication Error: {e}")
+            return None
+        # ★下面这一段是连接linux主机的，非invoke_shell
+        cmd_index = 0
+        for code in self.command_list:
+            if not isinstance(code, OneLineCode):
+                return
+            print(f"执行命令{cmd_index} : {code.code_content.strip()}")
+            stdin, stdout, stderr = ssh_client.exec_command(code.code_content)
+            stdout_line_list = stdout.readlines()
+            if len(stdout_line_list) != 0:
+                output = SSHOperatorOutput(code_index=cmd_index, code_exec_method=CODE_EXEC_METHOD_EXEC_COMMAND,
+                                           code_content=code.code_content,
+                                           exec_command_stdout_line_list=stdout_line_list)
+                self.output_list.append(output)
+                print(f"命令{cmd_index} 输出结果:")
+                for ret_line in stdout_line_list:
+                    print(ret_line, end="")
+            stderr_line_list = stderr.readlines()
+            if len(stderr_line_list) != 0:
+                output = SSHOperatorOutput(code_index=cmd_index, code_exec_method=CODE_EXEC_METHOD_EXEC_COMMAND,
+                                           code_content=code.code_content,
+                                           exec_command_stderr_line_list=stderr_line_list)
+                self.output_list.append(output)
+                print(f"命令{cmd_index} stderr结果:")
+                for ret_line in stderr_line_list:
+                    print(ret_line, end="")
+            if len(stdout_line_list) == 0 and len(stderr_line_list) == 0:
+                output = SSHOperatorOutput(code_index=cmd_index, code_exec_method=CODE_EXEC_METHOD_EXEC_COMMAND,
+                                           code_content=code.code_content,
+                                           is_empty_output=True)
+                self.output_list.append(output)
+            cmd_index += 1
+        ssh_client.close()
+        self.is_finished = True
 
 
 # #################################  end of module's class  ##############################
