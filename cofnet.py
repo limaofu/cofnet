@@ -2,7 +2,7 @@
 # coding=utf-8
 # module name: cofnet
 # author: Cof-Lee
-# update: 2024-01-22
+# update: 2024-01-23
 # 本模块使用GPL-3.0开源协议
 
 """
@@ -421,12 +421,14 @@ class OneLineCode:
 
 class SSHOperatorOutput:
     def __init__(self, code_index=0, code_content=None, code_exec_method=CODE_EXEC_METHOD_INVOKE_SHELL,
-                 invoke_shell_output_str=None, is_empty_output=False, exec_command_stdout_line_list=None,
+                 invoke_shell_output_str=None, invoke_shell_output_last_line=None, is_empty_output=False,
+                 exec_command_stdout_line_list=None,
                  exec_command_stderr_line_list=None):
         self.code_index = code_index
         self.code_content = code_content
         self.code_exec_method = code_exec_method
         self.invoke_shell_output_str = invoke_shell_output_str
+        self.invoke_shell_output_last_line = invoke_shell_output_last_line
         self.exec_command_stdout_line_list = exec_command_stdout_line_list
         self.exec_command_stderr_line_list = exec_command_stderr_line_list
         self.is_empty_output = is_empty_output
@@ -473,19 +475,25 @@ class SSHOperator:
         for code in self.command_list:  # 开始执行命令
             if not isinstance(code, OneLineCode):
                 return
-            ssh_shell.send(code.code_content.encode('utf8'))  # 每次send发送命令后，ssh_shell会变，所以每次得重新传入此shell对象到线程函数里
-            ssh_shell.send("\n".encode('utf8'))  # 命令有可能不带\n换行，需要额外发送一个换行符
+            ssh_shell.send(code.code_content.strip().encode('utf8'))  # 每次send发送命令后，ssh_shell会变，所以每次得重新传入此shell对象到线程函数里
+            ssh_shell.send("\n".encode('utf8'))  # 命令strip()后，不带\n换行，需要额外发送一个换行符
             time.sleep(code.code_post_wait_time)  # 发送完命令后，要等待系统回复
             try:
                 recv = ssh_shell.recv(65535)
             except Exception as e:
                 print(e)
                 return
+            invoke_shell_output_str = recv.decode('utf8')
+            output_str_lines = invoke_shell_output_str.split('\n')
+            output_last_line_index = len(output_str_lines) - 1
+            output_last_line = output_str_lines[output_last_line_index]  # 命令输出最后一行（shell提示符，不带换行符的）
             output = SSHOperatorOutput(code_index=cmd_index, code_exec_method=CODE_EXEC_METHOD_INVOKE_SHELL,
-                                       code_content=code.code_content, invoke_shell_output_str=recv.decode('utf8'))
+                                       code_content=code.code_content, invoke_shell_output_str=invoke_shell_output_str,
+                                       invoke_shell_output_last_line=output_last_line)
             self.output_list.append(output)
-            print(f"命令{cmd_index} 输出结果如下 #############################################")
-            print(recv.decode('utf8'))
+            print(f"$$ 命令{cmd_index} $$ 输出结果如下 #############################################")
+            print(invoke_shell_output_str)
+            print(f"命令输出最后一行（shell提示符，不带换行符的）为:  {output_last_line.encode('utf8')}")  # 提示符末尾有个空格
             cmd_index += 1
         ssh_shell.close()
         ssh_client.close()
