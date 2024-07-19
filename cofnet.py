@@ -4,7 +4,7 @@
 # module name: cofnet
 # author: Cof-Lee
 # this module uses the GPL-3.0 open source protocol
-# update: 2024-05-01
+# update: 2024-07-19
 
 """
 术语解析:
@@ -76,10 +76,16 @@ def is_cidr(input_str: str) -> bool:
     else:
         return False
     seg_list3 = input_str.split("/")
-    seg_list4 = seg_list3[0].split(".")
-    ip_mask_int = int(seg_list4[0]) << 24 | int(seg_list4[1]) << 16 | int(seg_list4[2]) << 8 | int(seg_list4[3])
-    ip_mask_int_and = ip_mask_int & (0xFFFFFFFF << (32 - int(seg_list3[1])))
-    if ip_mask_int != ip_mask_int_and:
+    if len(seg_list3) == 2:
+        seg_list4 = seg_list3[0].split(".")
+        ip_mask_int = int(seg_list4[0]) << 24 | int(seg_list4[1]) << 16 | int(seg_list4[2]) << 8 | int(seg_list4[3])
+        if seg_list3[1].isdigit():
+            ip_mask_int_and = ip_mask_int & (0xFFFFFFFF << (32 - int(seg_list3[1])))
+        else:
+            return False
+        if ip_mask_int != ip_mask_int_and:
+            return False
+    else:
         return False
     return True
 
