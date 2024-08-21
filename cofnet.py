@@ -4,28 +4,39 @@
 # module name: cofnet
 # author: Cof-Lee
 # this module uses the GPL-3.0 open source protocol
-# update: 2024-07-19
+# update: 2024-08-21
 
 """
 术语解析:
-maskint    掩码数字型 ，如 24 ，子网掩码位数，           类型: int
-maskbyte   掩码字节型 ，如 255.255.255.0 ，子网掩码，   类型: str
-ip         ip地址称，如 10.1.1.2 ，不含掩码            类型: str
-netseg     网段，如 10.1.0.0 ，不含掩码                类型: str
-cidr       地址块，网段及掩码位数 ，如 10.1.0.0/16      类型: str
-hostseg    主机号，一个ip地址去除网段后，剩下的部分       类型: int
+maskint    ipv4掩码数字型 ，如 24 ，子网掩码位数，             类型: int
+maskbyte   ipv4掩码字节型 ，如 255.255.255.0 ，子网掩码，     类型: str
+ip         ipv4地址称，如 10.1.1.2 ，不含掩码                类型: str
+netseg     ipv4网段，如 10.1.0.0 ，不含掩码                  类型: str
+cidr       ipv4地址块，网段及掩码位数 ，如 10.1.0.0/16        类型: str
+hostseg    ipv4主机号，一个ip地址去除网段后，剩下的部分         类型: int
+maskintv6    ipv6掩码数字型 ，如 64 ，ipv6的子网掩码位数，地址块位数           类型: int
+ipv6         ipv6地址称，如 FD00:1234::abcd ，不含掩码                     类型: str
+ipv6_full    ipv6地址称完全展开式，非缩写形式，如 FD00:2222:3333:4444:5555:6666:7777:8888 ，不含掩码     类型: str
+ipv6_seg     ipv6地址块（2字节为一块），如 FD00                             类型: str
+netsegv6     ipv6网段，如 10.1.0.0 ，不含掩码                              类型: str
+cidrv6       ipv6地址块，网段及掩码位数 ，如 FD00:1234::/64                 类型: str
+
+规定：
+凡是is_开头的用于判断的函数，只返回True或False两个值，不报错，不抛出异常
 """
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
+import re
 
 
 # #################################  start of module's function  ##############################
+# #### ipv4 ####
 def is_ip_addr(input_str: str) -> bool:
     """
-    判断 输入字符串 是否为 ip地址，返回bool值，是则返回True，否则返回False
+    判断 输入字符串 是否为 ip地址（不带掩码），返回bool值，是则返回True，否则返回False
     """
     seg_list = input_str.split(".")
     if len(seg_list) != 4:
@@ -182,6 +193,7 @@ def maskint_to_maskbyte(maskint: int) -> str:
     将子网掩码数字型 转为 子网掩码字节型，例如：
     输入 16 输出 "255.255.0.0"
     输入 24 输出 "255.255.255.0
+    【输入错误会抛出Exception异常】
     """
     if maskint < 0 or maskint > 32:
         raise Exception("子网掩码数值应在[0-32]", maskint)
@@ -217,6 +229,7 @@ def maskbyte_to_maskint(maskbyte: str) -> int:
     将子网掩码字节型 转为 子网掩码数字型，例如：
     输入 "255.255.255.0" 输出 24
     输入 "255.255.0.0"   输出 16
+    【输入错误会抛出Exception异常】
     """
     if not is_ip_addr(maskbyte):
         raise Exception("不是正确的子网掩码,E1", maskbyte)
@@ -239,6 +252,7 @@ def ip_to_hex_string(ip_addresss: str) -> str:
     """
     将ip地址转为十六进制表示，例如：
     输入 "10.99.1.254" 输出 "0A6301FE"
+    【输入错误会抛出Exception异常】
     """
     if not is_ip_addr(ip_addresss):
         raise Exception("不是正确的ip地址,E1", ip_addresss)
@@ -255,6 +269,7 @@ def ip_mask_to_int(ip_or_mask: str) -> int:
     将 ip地址或掩码byte型 转为 32 bit的数值，例如：
     输入 "255.255.255.0" 输出 4294967040
     输入 "192.168.1.1"   输出 3232235777
+    【输入错误会抛出Exception异常】
     """
     if not is_ip_addr(ip_or_mask):
         raise Exception("不是正确的ip地址或掩码", ip_or_mask)
@@ -268,6 +283,7 @@ def ip_mask_to_binary_space(ip_or_mask: str) -> str:
     将 ip地址或掩码byte型 转为 二进制数表示，★每8位数插入1个空格，例如：
     输入 "255.255.255.0" 输出
     输入 "192.168.1.1"   输出
+    【输入错误会抛出Exception异常】
     """
     if not is_ip_addr(ip_or_mask):
         raise Exception("不是正确的ip地址或掩码", ip_or_mask)
@@ -282,6 +298,7 @@ def ip_mask_to_binary_space(ip_or_mask: str) -> str:
 def get_maskint_with_space(maskint: int) -> int:
     """
     根据子网掩码位数，返回带空格时的掩码总长度，即每8位加1个空格字符
+    【输入错误会抛出Exception异常】
     """
     if not isinstance(maskint, int):
         raise Exception("不是正确的子风掩码位数", maskint)
@@ -299,6 +316,7 @@ def int32_to_ip(int32: int) -> str:
     """
     将 32bit数值 转为 ipv4地址，例如:
     输入 174260481 输出 "10.99.1.1"
+    【输入错误会抛出Exception异常】
     """
     if int32 < 0 or int32 > 4294967295:
         raise Exception("ip地址数值应在[0-4294967295]", int32)
@@ -316,6 +334,7 @@ def get_netseg_int(ip: str, maskintorbyte: str) -> int:
     根据 子网掩码 获 取ip地址的 网段（int值），子网掩码可为int型或byte型，例如：
     输入 "10.99.1.1","24"             输出 174260480
     输入 "10.99.1.1","255.255.255.0"  输出 174260480
+    【输入错误会抛出Exception异常】
     """
     if not is_ip_addr(ip):
         raise Exception("不是正确的ip地址,E1", ip)
@@ -342,6 +361,7 @@ def get_netseg_byte(ip: str, maskintorbyte: str) -> str:
     输入 "10.99.1.1","255.255.255.0"  输出 10.99.1.0
     依赖上面的2个函数:  get_netseg_int() 以及 int32_to_ip()
     input <str,int/str> , output <str>
+    【输入错误会抛出Exception异常】
     """
     return int32_to_ip(get_netseg_int(ip, maskintorbyte))
 
@@ -351,6 +371,7 @@ def get_netseg_byte_c(cidr: str) -> str:
     根据 cidr 获 取ip地址的 网段（byte值），子网掩码可为int型或byte型，例如：
     输入 "10.99.1.1/24"     输出 10.99.1.0
     依赖上面的2个函数:  get_netseg_int() 以及 int32_to_ip()
+    【输入错误会抛出Exception异常】
     """
     ip_mask_seg = cidr.split("/")
     return int32_to_ip(get_netseg_int(ip_mask_seg[0], ip_mask_seg[1]))
@@ -361,6 +382,7 @@ def get_hostseg_int(ip: str, maskintorbyte: str) -> int:
     根据 子网掩码 获 取ip地址的 主机号（int值），子网掩码可为int型或byte型，例如：
     输入 "10.99.1.145","24"             输出 145 （主机号为第4个字节的值）
     输入 "10.99.1.145","255.255.255.0"  输出 145
+    【输入错误会抛出Exception异常】
     """
     if not is_ip_addr(ip):
         raise Exception("不是正确的ip地址,E1", ip)
@@ -396,9 +418,11 @@ def is_ip_in_cidr(ip: str, cidr: str) -> bool:
     输入 "10.99.3.1","10.99.1.0/24"  输出 False
     """
     if not is_ip_addr(ip):
-        raise Exception("不是正确的ip地址,E1", ip)
+        # raise Exception("不是正确的ip地址,E1", ip)
+        return False
     if not is_cidr(cidr):
-        raise Exception("不是正确的cidr地址块,E2", cidr)
+        # raise Exception("不是正确的cidr地址块,E2", cidr)
+        return False
     netseg_maskint = cidr.split("/")
     netseg = netseg_maskint[0]
     maskint = netseg_maskint[1]
@@ -417,11 +441,14 @@ def is_ip_in_net_maskbyte(ip: str, net: str, maskbyte: str) -> bool:
     输入 "10.99.3.1","10.99.1.0","255.255.255.0"  输出 False
     """
     if not is_ip_addr(ip):
-        raise Exception("不是正确的ip地址,E1", ip)
+        # raise Exception("不是正确的ip地址,E1", ip)
+        return False
     if not is_ip_addr(net):
-        raise Exception("不是正确的网段,E2", net)
+        # raise Exception("不是正确的网段,E2", net)
+        return False
     if not is_ip_addr(maskbyte):
-        raise Exception("不是正确的掩码,E3", maskbyte)
+        # raise Exception("不是正确的掩码,E3", maskbyte)
+        return False
     ipnetsegint = get_netseg_int(ip, maskbyte)
     netsegint = get_netseg_int(net, maskbyte)
     if ipnetsegint == netsegint:
@@ -438,15 +465,131 @@ def is_ip_in_range(targetip: str, start_ip: str, end_ip: str) -> bool:
     input <str, str, str> , output <bool>
     """
     if not is_ip_addr(targetip):
-        raise Exception("不是正确的ip地址,E1", targetip)
+        # raise Exception("不是正确的ip地址,E1", targetip)
+        return False
     if not is_ip_addr(start_ip):
-        raise Exception("不是正确的ip地址,E2", start_ip)
+        # raise Exception("不是正确的ip地址,E2", start_ip)
+        return False
     if not is_ip_addr(end_ip):
-        raise Exception("不是正确的ip地址,E3", end_ip)
+        # raise Exception("不是正确的ip地址,E3", end_ip)
+        return False
     if ip_mask_to_int(end_ip) >= ip_mask_to_int(targetip) >= ip_mask_to_int(start_ip):
         return True
     else:
         return False
+
+
+# ###### ipv6 ######
+def is_ipv6_addr(input_str: str) -> bool:
+    """
+    判断 输入字符串 是否为 ipv6地址（不带掩码），返回bool值，是则返回True，否则返回False
+    """
+    seg_list_sp = input_str.split("/")
+    if len(seg_list_sp) > 1:
+        return False
+    match_pattern = r'\:{2,}'
+    ret = re.findall(match_pattern, input_str, flags=re.I)
+    if ret.__len__() >= 2:
+        return False
+    match_pattern2 = r'\:{3,}'
+    ret2 = re.findall(match_pattern2, input_str, flags=re.I)
+    if ret2.__len__() >= 1:
+        return False
+    seg_list = input_str.split("::")
+    if len(seg_list) == 1:  # 没有 "::" 0位缩写，则必须有8块
+        seg_list0 = input_str.split(":")
+        if len(seg_list0) != 8:
+            return False
+        for ipv6_seg in seg_list0:
+            try:
+                if int(ipv6_seg, base=16) > 0xFFFF or int(ipv6_seg, base=16) < 0:
+                    return False
+            except ValueError:
+                return False
+        return True
+    elif len(seg_list) == 2:  # 只有1个 "::" 0位缩写，每个::缩写至少为2个块
+        seg_list_head = seg_list[0].split(":")
+        seg_list_tail = seg_list[1].split(":")
+        if len(seg_list_head) + len(seg_list_tail) > 6:
+            return False
+        for ipv6_seg in seg_list_head:
+            try:
+                if int(ipv6_seg, base=16) > 0xFFFF or int(ipv6_seg, base=16) < 0:
+                    return False
+            except ValueError:
+                return False
+        for ipv6_seg in seg_list_tail:
+            try:
+                if int(ipv6_seg, base=16) > 0xFFFF or int(ipv6_seg, base=16) < 0:
+                    return False
+            except ValueError:
+                return False
+        return True
+    else:
+        return False
+
+
+def is_cidrv6(input_str: str) -> bool:
+    """
+    判断 输入字符串 是否为 cidrv6地址块，返回bool值，是则返回True，否则返回False
+    输入 "10.99.1.0/24" 输出 True
+    输入 "10.99.1.1/24" 输出 False ，不是正确的cidr地址块写法，24位掩码，的最后一字节必须为0
+    """
+    seg_list = input_str.split("/")
+    if len(seg_list) != 2:
+        return False
+    if not is_ipv6_addr(seg_list[0]):
+        return False
+    if seg_list[1].isdigit():
+        if 0 > int(seg_list[1]) or int(seg_list[1]) > 128:
+            return False
+        else:
+            return True
+    else:
+        return False
+
+
+def convert_to_ipv6_seg_full(ipv6_seg: str) -> str:
+    """
+    将ipv6的地址块（2字节为一块）转为4个字符的16进制数
+    """
+    if len(ipv6_seg) == 1:
+        return "000" + ipv6_seg
+    elif len(ipv6_seg) == 2:
+        return "00" + ipv6_seg
+    elif len(ipv6_seg) == 3:
+        return "0" + ipv6_seg
+    elif len(ipv6_seg) == 4:
+        return ipv6_seg
+    else:
+        raise Exception("不是正确的ipv6地址块（2字节为一块）,E1", ipv6_seg)
+
+
+def convert_to_ipv6_full(ipv6_address: str) -> str:
+    """
+    输入ipv6地址，转为完全展开式的ipv6地址（非缩写形式）
+    输入 "FD00:123::11" 输出 "FD00:0123:0000:0000:0000:0000:0000:0011"
+    """
+    if not is_ipv6_addr(ipv6_address):
+        raise Exception("不是正确的ipv6地址,E1", ipv6_address)
+    ipv6_full_seg_list = []
+    seg_list = ipv6_address.split("::")
+    if len(seg_list) == 1:  # 没有 "::" 0位缩写，则必须有8块
+        seg_list0 = ipv6_address.split(":")
+        for ipv6_seg in seg_list0:
+            ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
+        return ":".join(ipv6_full_seg_list)
+    elif len(seg_list) == 2:  # 只有1个 "::" 0位缩写，每个::缩写至少为2个块
+        seg_list_head = seg_list[0].split(":")
+        seg_list_tail = seg_list[1].split(":")
+        len_seg = len(seg_list_head) + len(seg_list_tail)
+        for ipv6_seg in seg_list_head:
+            ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
+        for seg_zero in range(8 - len_seg):
+            ipv6_full_seg_list.append("0000")
+        for ipv6_seg in seg_list_tail:
+            ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
+        return ":".join(ipv6_full_seg_list)
 
 
 # #################################  end of module's function  ##############################
