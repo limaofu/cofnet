@@ -4,7 +4,7 @@
 # module name: cofnet
 # author: Cof-Lee
 # this module uses the GPL-3.0 open source protocol
-# update: 2024-08-21
+# update: 2024-08-22
 
 """
 术语解析:
@@ -507,24 +507,49 @@ def is_ipv6_addr(input_str: str) -> bool:
             except ValueError:
                 return False
         return True
-    elif len(seg_list) == 2:  # 只有1个 "::" 0位缩写，每个::缩写至少为2个块
-        seg_list_head = seg_list[0].split(":")
-        seg_list_tail = seg_list[1].split(":")
-        if len(seg_list_head) + len(seg_list_tail) > 6:
-            return False
-        for ipv6_seg in seg_list_head:
-            try:
-                if int(ipv6_seg, base=16) > 0xFFFF or int(ipv6_seg, base=16) < 0:
-                    return False
-            except ValueError:
+    elif len(seg_list) == 2:  # 只有1个 "::" 0位缩写，则全0缩写:: 至少为2个块
+        if seg_list[0] != "" and seg_list[1] != "":  # 例如 FD00::ffff
+            seg_list_head = seg_list[0].split(":")
+            seg_list_tail = seg_list[1].split(":")
+            if len(seg_list_head) + len(seg_list_tail) > 6:
                 return False
-        for ipv6_seg in seg_list_tail:
-            try:
-                if int(ipv6_seg, base=16) > 0xFFFF or int(ipv6_seg, base=16) < 0:
+            for ipv6_seg in seg_list_head:
+                try:
+                    if int(ipv6_seg, base=16) > 0xFFFF or int(ipv6_seg, base=16) < 0:
+                        return False
+                except ValueError:
                     return False
-            except ValueError:
+            for ipv6_seg in seg_list_tail:
+                try:
+                    if int(ipv6_seg, base=16) > 0xFFFF or int(ipv6_seg, base=16) < 0:
+                        return False
+                except ValueError:
+                    return False
+            return True
+        elif seg_list[0] == "" and seg_list[1] != "":  # 例如 ::ffff
+            seg_list_tail = seg_list[1].split(":")
+            if len(seg_list_tail) > 6:
                 return False
-        return True
+            for ipv6_seg in seg_list_tail:
+                try:
+                    if int(ipv6_seg, base=16) > 0xFFFF or int(ipv6_seg, base=16) < 0:
+                        return False
+                except ValueError:
+                    return False
+            return True
+        elif seg_list[0] != "" and seg_list[1] == "":  # 例如 FD00::
+            seg_list_head = seg_list[0].split(":")
+            if len(seg_list_head) > 6:
+                return False
+            for ipv6_seg in seg_list_head:
+                try:
+                    if int(ipv6_seg, base=16) > 0xFFFF or int(ipv6_seg, base=16) < 0:
+                        return False
+                except ValueError:
+                    return False
+            return True
+        else:  # ::的情况（全0）
+            return True
     else:
         return False
 
@@ -551,23 +576,24 @@ def is_cidrv6(input_str: str) -> bool:
 
 def convert_to_ipv6_seg_full(ipv6_seg: str) -> str:
     """
-    将ipv6的地址块（2字节为一块）转为4个字符的16进制数
+    将ipv6的地址块（2字节为一块）转为4个字符的16进制数，返回的十六进制数都用大写字母表示
+    输入 "fd"  输出 "00FD"
     """
     if len(ipv6_seg) == 1:
-        return "000" + ipv6_seg
+        return "000" + ipv6_seg.upper()
     elif len(ipv6_seg) == 2:
-        return "00" + ipv6_seg
+        return "00" + ipv6_seg.upper()
     elif len(ipv6_seg) == 3:
-        return "0" + ipv6_seg
+        return "0" + ipv6_seg.upper()
     elif len(ipv6_seg) == 4:
-        return ipv6_seg
+        return ipv6_seg.upper()
     else:
         raise Exception("不是正确的ipv6地址块（2字节为一块）,E1", ipv6_seg)
 
 
 def convert_to_ipv6_full(ipv6_address: str) -> str:
     """
-    输入ipv6地址，转为完全展开式的ipv6地址（非缩写形式）
+    输入ipv6地址，转为完全展开式的ipv6地址（非缩写形式），返回的十六进制数都用大写字母表示
     输入 "FD00:123::11" 输出 "FD00:0123:0000:0000:0000:0000:0000:0011"
     """
     if not is_ipv6_addr(ipv6_address):
@@ -579,17 +605,86 @@ def convert_to_ipv6_full(ipv6_address: str) -> str:
         for ipv6_seg in seg_list0:
             ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
         return ":".join(ipv6_full_seg_list)
-    elif len(seg_list) == 2:  # 只有1个 "::" 0位缩写，每个::缩写至少为2个块
-        seg_list_head = seg_list[0].split(":")
-        seg_list_tail = seg_list[1].split(":")
-        len_seg = len(seg_list_head) + len(seg_list_tail)
-        for ipv6_seg in seg_list_head:
-            ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
-        for seg_zero in range(8 - len_seg):
-            ipv6_full_seg_list.append("0000")
-        for ipv6_seg in seg_list_tail:
-            ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
-        return ":".join(ipv6_full_seg_list)
+    else:  # 只有1个 "::" 0位缩写，每个::缩写至少为2个块
+        if seg_list[0] != "" and seg_list[1] != "":  # 例如 FD00::ffff
+            seg_list_head = seg_list[0].split(":")
+            seg_list_tail = seg_list[1].split(":")
+            len_seg = len(seg_list_head) + len(seg_list_tail)
+            for ipv6_seg in seg_list_head:
+                ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
+            for seg_zero in range(8 - len_seg):
+                ipv6_full_seg_list.append("0000")
+            for ipv6_seg in seg_list_tail:
+                ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
+            return ":".join(ipv6_full_seg_list)
+        elif seg_list[0] == "" and seg_list[1] != "":  # 例如 ::ffff
+            seg_list_tail = seg_list[1].split(":")
+            for seg_zero in range(8 - len(seg_list_tail)):
+                ipv6_full_seg_list.append("0000")
+            for ipv6_seg in seg_list_tail:
+                ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
+            return ":".join(ipv6_full_seg_list)
+        elif seg_list[0] != "" and seg_list[1] == "":  # 例如 FD00::
+            seg_list_head = seg_list[0].split(":")
+            for ipv6_seg in seg_list_head:
+                ipv6_full_seg_list.append(convert_to_ipv6_seg_full(ipv6_seg))
+            for seg_zero in range(8 - len(seg_list_head)):
+                ipv6_full_seg_list.append("0000")
+            return ":".join(ipv6_full_seg_list)
+        else:  # ::的情况（全0）
+            return "0000:0000:0000:0000:0000:0000:0000:0000"
+
+
+def convert_to_ipv6_seg_short(ipv6_seg: str) -> str:
+    """
+    将ipv6的地址块（2字节为一块）转为缩写形式的地址块（最前面的0省略），返回的十六进制数都用大写字母表示
+    输入 "00FD"  输出 "FD"
+    """
+    return str(hex(int(ipv6_seg, base=16))).replace("0x", "").upper()
+
+
+def convert_to_ipv6_short(ipv6_address: str) -> str:
+    """
+        输入ipv6地址，转为缩写形式的ipv6地址（全0块缩写为::），返回的十六进制数都用大写字母表示
+        输入 "FD00:0123:0000:0000:0000:0000:0000:0011" 输出 "FD00:123::11"
+        """
+    if not is_ipv6_addr(ipv6_address):
+        raise Exception("不是正确的ipv6地址,E1", ipv6_address)
+    # 先转为完全展开形式的ipv6地址，再转为缩写形式
+    ipv6_full_address = convert_to_ipv6_full(ipv6_address)
+    ipv6_full_address_seg_list = ipv6_full_address.split(":")
+    ipv6_full_address_short = []
+    ipv6_full_address_short_re = []
+    for ipv6_seg in ipv6_full_address_seg_list:
+        ipv6_seg_short = convert_to_ipv6_seg_short(ipv6_seg)
+        ipv6_full_address_short.append(ipv6_seg_short)
+        if ipv6_seg_short != "0":
+            ipv6_full_address_short_re.append("1")
+        else:
+            ipv6_full_address_short_re.append("0")
+    # 使用re去查找最长的全0块
+    match_pattern = r'(?:0)+'
+    ret2 = re.finditer(match_pattern, "".join(ipv6_full_address_short_re), flags=re.I)
+    ret_list = []
+    ret_len_list = []
+    for ret_item in ret2:
+        ret_len_list.append(ret_item.span()[1] - ret_item.span()[0])
+        ret_list.append(ret_item)
+    longgest = max(ret_len_list)
+    if longgest >= 2:
+        max_index = ret_len_list.index(longgest)
+        ipv6_full_address_short_head = ipv6_full_address_short[0:ret_list[max_index].span()[0]]
+        ipv6_full_address_short_tail = ipv6_full_address_short[ret_list[max_index].span()[1]:]
+        if len(ipv6_full_address_short_head) != 0 and len(ipv6_full_address_short_tail) != 0:
+            return ":".join(ipv6_full_address_short_head) + "::" + ":".join(ipv6_full_address_short_tail)
+        elif len(ipv6_full_address_short_head) == 0 and len(ipv6_full_address_short_tail) != 0:
+            return "::" + ":".join(ipv6_full_address_short_tail)
+        elif len(ipv6_full_address_short_head) != 0 and len(ipv6_full_address_short_tail) == 0:
+            return ":".join(ipv6_full_address_short_head) + "::"
+        else:
+            return "::"
+    else:
+        return ":".join(ipv6_full_address_short)
 
 
 # #################################  end of module's function  ##############################
