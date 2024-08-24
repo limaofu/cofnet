@@ -4,7 +4,7 @@
 # module name: cofnet
 # author: Cof-Lee
 # this module uses the GPL-3.0 open source protocol
-# update: 2024-08-23
+# update: 2024-08-24
 
 """
 术语解析:
@@ -693,7 +693,7 @@ def get_ipv6_prefix(ipv6_address: str, ipv6_prefix_len: int) -> str:
     获取ipv6地址前缀（不带/前缀长度）
     输入 "FD00:0234::11, 64"  输出 "FD00:234::"
     输入 "FD00:0000:0000:0000:0000:0000:0000:8811, 80"  输出 "FD00::"
-    输入 "FD00:0000:0000:0000:000A:0000:0000:8811, 80"  输出 "FD00::A:0:0:0"  #最后3个0不能删除，否则看不出来::是几个全0块了
+    输入 "FD00:0000:0000:0000:000A:0000:0000:8811, 80"  输出 "FD00::A:0:0:0"  #因为不带前缀长度，最后3个0不能删除，否则看不出来::是几个全0块了
     """
     if not is_ipv6_addr(ipv6_address):
         raise Exception("不是正确的ipv6地址,E1", ipv6_address)
