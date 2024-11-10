@@ -4,7 +4,7 @@
 # module name: cofnet
 # author: Cof-Lee
 # this module uses the GPL-3.0 open source protocol
-# update: 2024-09-07
+# update: 2024-11-10
 
 """
 ★术语解析:
@@ -15,6 +15,7 @@ maskbyte           ipv4掩码字节型，如 255.255.255.0 ，子网掩码      
 netseg             ipv4网段，如 10.1.0.0 ，不含掩码                           类型: str
 hostseg            ipv4主机号，一个ip地址去除网段后，剩下的部分（十进制数值）       类型: int
 ip_with_maskint    ip/子网掩码位数 的格式，如 10.1.1.2/24                      类型: str
+wildcard_mask      反掩码，也叫通配符掩码，如 0.0.0.255                         类型: str
 
 ipv6               ipv6地址，如 FD00:1234::abcd ，不含掩码（也可写为ipv6_address）                        类型: str
 cidrv6             ipv6地址块，网段及掩码位数 ，如 FD00:1234::/64                                         类型: str
@@ -210,6 +211,27 @@ def maskint_to_maskbyte(maskint: int) -> str:
     if i < 4:
         mask[i] = 255 - (2 ** (8 - maskint) - 1)
     mask_str_list = map(str, mask)
+    return ".".join(mask_str_list)
+
+
+def maskint_to_wildcard_mask(maskint: int) -> str:
+    """
+    将子网掩码数字型 转为 反掩码，例如：
+    输入 16 输出 "0.0.255.255"
+    输入 24 输出 "0.0.0.255
+    【输入错误会抛出Exception异常】
+    """
+    if maskint < 0 or maskint > 32:
+        raise Exception("子网掩码数值应在[0-32]", maskint)
+    wildcard_mask = [255, 255, 255, 255]
+    i = 0
+    while maskint >= 8:
+        wildcard_mask[i] = 0
+        i += 1
+        maskint -= 8
+    if i < 4:
+        wildcard_mask[i] = 2 ** (8 - maskint) - 1
+    mask_str_list = map(str, wildcard_mask)
     return ".".join(mask_str_list)
 
 
