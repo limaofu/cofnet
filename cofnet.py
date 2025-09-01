@@ -4,27 +4,27 @@
 # module name: cofnet
 # author: Cof-Lee <cof8007@gmail.com>
 # this module uses the GPL-3.0 open source protocol
-# update: 2024-11-17
+# update: 2025-09-01
 
 """
 ★术语解析:
-ip                      ipv4地址，如 10.1.1.2 ，不含掩码（也可写为ip_address）       类型: str
-cidr                    ipv4地址块，网段及掩码位数 ，如 10.1.0.0/16                  类型: str
-maskint                 ipv4掩码数字型，如 24 ，子网掩码位数                         类型: int
-maskbyte                ipv4掩码字节型，如 255.255.255.0 ，子网掩码                 类型: str
-netseg                  ipv4网段，如 10.1.0.0 ，不含掩码                           类型: str
-hostseg                 ipv4主机号，一个ip地址去除网段后，剩下的部分（十进制数值）       类型: int
-ip_with_maskint         ip/子网掩码位数 的格式，如 10.1.1.2/24                      类型: str
-wildcard_mask           反掩码，也叫通配符掩码，如 0.0.0.255                         类型: str
+ip                      <str>  ipv4地址，如 10.1.1.2 ，不含掩码（也可写为ip_address）
+cidr                    <str>  ipv4地址块，网段及掩码位数 ，如 10.1.0.0/16
+maskint                 <int>  ipv4掩码数字型，如 24 ，子网掩码位数
+maskbyte                <str>  ipv4掩码字节型，如 255.255.255.0 ，子网掩码
+netseg                  <str>  ipv4网段，如 10.1.0.0 ，不含掩码
+hostseg                 <int>  ipv4主机号，一个ip地址去除网段后，剩下的部分（十进制数值）
+ip_with_maskint         <str>  ip/子网掩码位数 的格式，如 10.1.1.2/24
+wildcard_mask           <str>  反掩码，也叫通配符掩码，如 0.0.0.255
 
-ipv6                    ipv6地址，如 FD00:1234::abcd ，不含前缀长度（也可写为ipv6_address）                        类型: str
-cidrv6                  ipv6地址块，网段及前缀长度 ，如 FD00:1234::/64                                           类型: str
-ipv6_full               ipv6地址完全展开式，非缩写形式，如 FD00:2222:3333:4444:5555:6666:0077:8888 ，不含前缀长度    类型: str
-ipv6_short              ipv6地址缩写式，全0块缩写形式，如 FD00::8888 ，不含前缀长度                                 类型: str
-ipv6_seg                ipv6地址块（2字节为一块），如 FD00                                                       类型: str
-ipv6_prefix             ipv6地址前缀，网段，如 FD00:: ，不含前缀长度                                              类型: str
-ipv6_prefix_len         ipv6地址前缀长度 ，前缀大小，地址块bit位数，如 64                                          类型: int
-ipv6_with_prefix_len    ipv6地址前带缀长度 的表示格式，如 FD00::33/64                                            类型: str
+ipv6                    <str>  ipv6地址，如 FD00:1234::abcd ，不含前缀长度（也可写为ipv6_address）
+cidrv6                  <str>  ipv6地址块，网段及前缀长度 ，如 FD00:1234::/64
+ipv6_full               <str>  ipv6地址完全展开式，非缩写形式，如 FD00:2222:3333:4444:5555:6666:0077:8888 ，不含前缀长度
+ipv6_short              <str>  ipv6地址缩写式，全0块缩写形式，如 FD00::8888 ，不含前缀长度
+ipv6_seg                <str>  ipv6地址块（2字节为一块），如 FD00
+ipv6_prefix             <str>  ipv6地址前缀，网段，如 FD00:: ，不含前缀长度
+ipv6_prefix_len         <int>  ipv6地址前缀长度 ，前缀大小，地址块bit位数，如 64
+ipv6_with_prefix_len    <str>  ipv6地址前带缀长度 的表示格式，如 FD00::33/64
 
 ★规定：
 凡是以 is_ 开头的用于判断的函数，只返回True或False两个值，不报错，不抛出异常
@@ -850,7 +850,7 @@ def get_ipv6_prefix(ipv6_address: str, ipv6_prefix_len: int) -> str:
     # 先转为完全展开形式的ipv6地址，再去截取前缀
     ipv6_full_address = convert_to_ipv6_full(ipv6_address)
     ipv6_full_address_seg_list = ipv6_full_address.split(":")
-    prefix_seg_num = ipv6_prefix_len // 16
+    prefix_seg_num = int(ipv6_prefix_len // 16)
     prefix_last_seg_remainder = ipv6_prefix_len % 16
     if prefix_last_seg_remainder == 0:
         ipv6_prefix_seg_list = ipv6_full_address_seg_list[0:prefix_seg_num]
@@ -877,12 +877,12 @@ def get_ipv6_prefix_cidrv6(ipv6_address: str, ipv6_prefix_len: int) -> str:
     ipv6_prefix = get_ipv6_prefix(ipv6_address, ipv6_prefix_len)
     ipv6_prefix_split = ipv6_prefix.split("::")
     if len(ipv6_prefix_split) < 2:  # 没有"::"
-        not_drop_seg_num = 8 - ((128 - ipv6_prefix_len) // 16)
+        not_drop_seg_num = 8 - int(((128 - ipv6_prefix_len) // 16))
         new_ipv6_seg_list = ipv6_prefix_split[0].split(":")[0:not_drop_seg_num]
         return ":".join(new_ipv6_seg_list) + "/" + str(ipv6_prefix_len)
     else:  # 有一个"::"
         ipv6_seg_tail_list = ipv6_prefix_split[1].split(":")
-        not_drop_seg_num = len(ipv6_seg_tail_list) - ((128 - ipv6_prefix_len) // 16)
+        not_drop_seg_num = len(ipv6_seg_tail_list) - int(((128 - ipv6_prefix_len) // 16))
         new_ipv6_seg_tail_list = ipv6_seg_tail_list[0:not_drop_seg_num]
         return ipv6_prefix_split[0] + "::" + ":".join(new_ipv6_seg_tail_list) + "/" + str(ipv6_prefix_len)
 
