@@ -8,7 +8,7 @@
 
 """
 ★术语解析:
-ip                      <str>  ipv4地址，如 10.1.1.2 ，不含掩码（也可写为ip_address）
+ip                      <str>  ipv4地址，如 10.1.1.2 ，不含掩码（也可写为 ip_address）
 cidr                    <str>  ipv4地址块，网段及掩码位数 ，如 10.1.0.0/16
 maskint                 <int>  ipv4掩码数字型，如 24 ，子网掩码位数
 maskbyte                <str>  ipv4掩码字节型，如 255.255.255.0 ，子网掩码
@@ -41,13 +41,13 @@ import re
 
 # #################################  start of module's function  ##############################
 # #### ipv4 ####
-def is_ip_addr(input_str: str) -> bool:
+def is_ip_addr(ip_address: str) -> bool:
     """
     判断 输入的字符串 是否为 ipv4地址（不带掩码），返回bool值，是则返回True，否则返回False。例如：
     输入 "10.99.1.1"  返回  True
     输入  "10.99.1.1/24"  返回  False，纯ipv4地址不能带掩码
     """
-    seg_list = input_str.split(".")
+    seg_list = ip_address.split(".")
     if len(seg_list) != 4:
         return False
     if seg_list[0].isdigit():
@@ -73,13 +73,13 @@ def is_ip_addr(input_str: str) -> bool:
     return True
 
 
-def is_cidr(input_str: str) -> bool:
+def is_cidr(cidr: str) -> bool:
     """
     判断 输入字符串 是否为 cidr地址块，返回bool值，是则返回True，否则返回False
     输入 "10.99.1.0/24" 输出 True
     输入 "10.99.1.1/24" 输出 False ，不是正确的cidr地址块写法，24位掩码，的最后一字节必须为0
     """
-    netseg_maskint_seg_list = input_str.split("/")
+    netseg_maskint_seg_list = cidr.split("/")
     if len(netseg_maskint_seg_list) != 2:
         return False
     if not netseg_maskint_seg_list[1].isdigit():
@@ -172,13 +172,13 @@ def is_ip_with_maskint(input_str: str) -> bool:
     return True
 
 
-def is_ip_range(input_str: str) -> bool:
+def is_ip_range(ip_range: str) -> bool:
     """
     判断 输入字符串 是否为 ip地址范围，返回bool值，是则返回True，否则返回False
     输入 "10.99.1.33-55" 输出 True
     输入 "10.99.1.22-10" 输出 False ，不是正确的地址范围，首ip大于了尾ip（首ip可以等于尾ip）
     """
-    seg_list = input_str.split(".")
+    seg_list = ip_range.split(".")
     if len(seg_list) != 4:
         return False
     if seg_list[0].isdigit():
@@ -217,13 +217,13 @@ def is_ip_range(input_str: str) -> bool:
         return False
 
 
-def is_ip_range_2(input_str: str) -> bool:
+def is_ip_range_2(ip_range: str) -> bool:
     """
     判断 输入的字符串 是否为 ip地址范围，返回bool值，是则返回True，否则返回False
     输入 "10.99.1.33-10.99.1.55" 输出 True
     输入 "10.99.1.22-10.99.1.10" 输出 False ，不是正确的地址范围，首ip大于了尾ip（首ip可以等于尾ip）
     """
-    ip_list = input_str.split("-")
+    ip_list = ip_range.split("-")
     if len(ip_list) != 2:
         return False
     if not is_ip_addr(ip_list[0]):
@@ -235,15 +235,15 @@ def is_ip_range_2(input_str: str) -> bool:
     return True
 
 
-def is_maskbyte(input_str: str) -> bool:
+def is_maskbyte(maskbyte: str) -> bool:
     """
     判断输入的字符串 是否为 maskbyte掩码字节型，返回bool值，是则返回True，否则返回False
     输入 "255.255.0.0" 输出 True
     输入 "10.99.1.0" 输出 False，这是不一个正确的子网掩码
     """
-    if not is_ip_addr(input_str):
+    if not is_ip_addr(maskbyte):
         return False
-    maskbyte_to_int32 = ip_or_maskbyte_to_int(input_str)
+    maskbyte_to_int32 = ip_or_maskbyte_to_int(maskbyte)
     # 大力出奇迹，只能一个一个地对比了（可以把常用的掩码放前面）
     if maskbyte_to_int32 == 0xFFFFFF00:  # 24 位掩码
         return True
@@ -393,27 +393,27 @@ def maskbyte_to_maskint(maskbyte: str) -> int:
     return maskint
 
 
-def ip_to_hex_string(ip_addresss: str) -> str:
+def ip_to_hex_string(ip_address: str) -> str:
     """
     将ip地址转为十六进制表示，例如：
     输入 "10.99.1.254" 输出 "0A6301FE"
     【输入错误会抛出Exception异常】
     """
-    if not is_ip_addr(ip_addresss):
-        raise Exception("不是正确的ip地址,E1", ip_addresss)
-    return "".join("{:0>2X}".format(int(ip_seg_int)) for ip_seg_int in ip_addresss.split("."))
+    if not is_ip_addr(ip_address):
+        raise Exception("不是正确的ip地址,E1", ip_address)
+    return "".join("{:0>2X}".format(int(ip_seg_int)) for ip_seg_int in ip_address.split("."))
 
 
-def ip_or_maskbyte_to_int(ip_or_mask: str) -> int:
+def ip_or_maskbyte_to_int(ip_or_maskbyte: str) -> int:
     """
     将 ip地址或掩码byte型 转为 32 bit的数值，例如：
     输入 "255.255.255.0" 输出 4294967040
     输入 "192.168.1.1"   输出 3232235777
     【输入错误会抛出Exception异常】
     """
-    if not is_ip_addr(ip_or_mask):
-        raise Exception("不是正确的ip地址或掩码", ip_or_mask)
-    seg_list = ip_or_mask.split(".")
+    if not is_ip_addr(ip_or_maskbyte):
+        raise Exception("不是正确的ip地址或掩码", ip_or_maskbyte)
+    seg_list = ip_or_maskbyte.split(".")
     ip_mask_int = int(seg_list[0]) << 24 | int(seg_list[1]) << 16 | int(seg_list[2]) << 8 | int(seg_list[3])
     return ip_mask_int
 
@@ -619,6 +619,41 @@ def is_ip_in_range(targetip: str, start_ip: str, end_ip: str) -> bool:
         return True
     else:
         return False
+
+
+def generate_ip_list_by_ip_range(ip_range: str) -> list[str]:
+    """
+    根据 ip_range 生成ip list
+    输入 "10.99.1.1-3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
+    """
+    if is_ip_range(ip_range):
+        input_str_seg1_list = ip_range.split("-")
+        input_str_seg11_list = input_str_seg1_list[0].split(".")  # 取p第4个字节
+        start_ip_int = ip_or_maskbyte_to_int(input_str_seg1_list[0])
+        end_ip_int = start_ip_int + int(input_str_seg1_list[1]) - int(input_str_seg11_list[3])
+        ip_list = []
+        for ip_int in range(start_ip_int, end_ip_int + 1):
+            ip_list.append(int32_to_ip(ip_int))
+        return ip_list
+    else:
+        return []
+
+
+def generate_ip_list_by_ip_range_2(ip_range: str) -> list[str]:
+    """
+    根据 ip_range 生成ip list
+    输入 "10.99.1.1-3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
+    """
+    if is_ip_range_2(ip_range):
+        input_str_seg1_list = ip_range.split("-")
+        start_ip_int = ip_or_maskbyte_to_int(input_str_seg1_list[0])
+        end_ip_int = ip_or_maskbyte_to_int(input_str_seg1_list[1])
+        ip_list = []
+        for ip_int in range(start_ip_int, end_ip_int + 1):
+            ip_list.append(int32_to_ip(ip_int))
+        return ip_list
+    else:
+        return []
 
 
 # ################ ipv6 ################
