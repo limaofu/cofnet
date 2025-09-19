@@ -5,7 +5,7 @@
 # author: Cof-Lee <cof8007@gmail.com>
 # this module uses the GPL-3.0 open source protocol
 # only for python3
-# update: 2025-09-18
+# update: 2025-09-19
 
 
 """
@@ -35,6 +35,10 @@ ipv6_with_prefix_len    <str>  ipv6地址前带缀长度 的表示格式，如 F
 """
 
 import re
+
+# 版本，版本号同update日期
+version = "2025-09-19"
+requires_python = ">=3.6"
 
 
 # #################################  start of module's function  ##############################
@@ -343,11 +347,12 @@ def maskbyte_to_maskint(maskbyte: str) -> int:
     if not is_ip_addr(maskbyte):
         raise Exception("不是正确的子网掩码,E1", maskbyte)
     mask_seg_1_number = 0
-    maskbyte_int = ip_or_maskbyte_to_int(maskbyte)
+    maskbyte_int_ori = ip_or_maskbyte_to_int(maskbyte)
+    maskbyte_int = maskbyte_int_ori
     while maskbyte_int != 0:
         mask_seg_1_number += 1
         maskbyte_int = (maskbyte_int << 1) & 0xFFFFFFFF
-    if maskbyte != get_netseg_byte(maskbyte, str(mask_seg_1_number)):
+    if (maskbyte_int_ori | (2 ** (32 - mask_seg_1_number) - 1)) != 0xFFFFFFFF:
         raise Exception("不是正确的子网掩码,E2", maskbyte)
     return mask_seg_1_number
 
@@ -360,8 +365,7 @@ def ip_to_hex_string(ip_address: str) -> str:
     """
     if not is_ip_addr(ip_address):
         raise Exception("不是正确的ip地址,E1", ip_address)
-    ip_int = ip_or_maskbyte_to_int(ip_address)
-    return hex(ip_int)
+    return f"{ip_or_maskbyte_to_int(ip_address):0>10X}"[2:]
 
 
 def ip_or_maskbyte_to_int(ip_or_maskbyte: str) -> int:
@@ -603,6 +607,7 @@ def generate_ip_list_by_ip_range_2(ip_range: str) -> list[str]:
     """
     根据 ip_range 生成ip list
     输入 "10.99.1.1-3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
+    输入 错误的ip_range  输出 [] 空列表
     """
     if is_ip_range_2(ip_range):
         input_str_seg1_list = ip_range.split("-")
@@ -614,6 +619,24 @@ def generate_ip_list_by_ip_range_2(ip_range: str) -> list[str]:
         return ip_list
     else:
         return []
+
+
+def ip_to_net_system_id(ip_address: str) -> str:
+    """
+    根据ipv4地址生成isis中的NET system-id，示例：
+    输入 "10.99.1.2" 输出 "0100.9900.1002"
+    """
+    if not is_ip_addr(ip_address):
+        raise TypeError(f"ip_address <{ip_address}> is invalid")
+    ip_seg_list = ip_address.split(".")
+    new_ip_seg_list = []
+    for ip_seg in ip_seg_list:
+        new_ip_seg_list.append(f"{int(ip_seg):0>3d}")
+    system_id_lst = [
+        new_ip_seg_list[0][0], new_ip_seg_list[0][1], new_ip_seg_list[0][2], new_ip_seg_list[1][0], ".",
+        new_ip_seg_list[1][1], new_ip_seg_list[1][2], new_ip_seg_list[2][0], new_ip_seg_list[2][1], ".",
+        new_ip_seg_list[2][2], new_ip_seg_list[3][0], new_ip_seg_list[3][1], new_ip_seg_list[3][2]]
+    return "".join(system_id_lst)
 
 
 # ################ ipv6 ################
