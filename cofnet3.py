@@ -5,7 +5,7 @@
 # author: Cof-Lee <cof8007@gmail.com>
 # this module uses the GPL-3.0 open source protocol
 # only for python3
-# update: 2025-09-19
+# update: 2025-09-20
 
 
 """
@@ -37,7 +37,7 @@ ipv6_with_prefix_len    <str>  ipv6地址前带缀长度 的表示格式，如 F
 import re
 
 # 版本，版本号同update日期
-version = "2025-09-19"
+version = "2025-09-20"
 requires_python = ">=3.6"
 
 
@@ -361,10 +361,10 @@ def ip_to_hex_string(ip_address: str) -> str:
     """
     将ip地址转为十六进制表示，例如：
     输入 "10.99.1.254" 输出 "0A6301FE"
-    【输入错误会抛出Exception异常】
+    【输入错误会抛出Exception异常】  不再抛出异常了-2025年9月19日
     """
-    if not is_ip_addr(ip_address):
-        raise Exception("不是正确的ip地址,E1", ip_address)
+    # if not is_ip_addr(ip_address):
+    #    raise Exception("不是正确的ip地址,E1", ip_address)
     return f"{ip_or_maskbyte_to_int(ip_address):0>10X}"[2:]
 
 
@@ -373,10 +373,10 @@ def ip_or_maskbyte_to_int(ip_or_maskbyte: str) -> int:
     将 ip地址或掩码byte型 转为 32 bit的数值，例如：
     输入 "255.255.255.0" 输出 4294967040
     输入 "192.168.1.1"   输出 3232235777
-    【输入错误会抛出Exception异常】
+    【输入错误会抛出Exception异常】 不再抛出异常了，需要自己判断输入的是否为正确的ip/maskbyte
     """
-    if not is_ip_addr(ip_or_maskbyte):
-        raise Exception("不是正确的ip地址或掩码", ip_or_maskbyte)
+    # if not is_ip_addr(ip_or_maskbyte):
+    #    raise Exception("不是正确的ip地址或掩码", ip_or_maskbyte)
     seg_list = ip_or_maskbyte.split(".")
     ip_mask_int = int(seg_list[0]) << 24 | int(seg_list[1]) << 16 | int(seg_list[2]) << 8 | int(seg_list[3])
     return ip_mask_int
@@ -589,10 +589,11 @@ def generate_ip_list_by_ip_range(ip_range: str) -> list[str]:
     """
     根据 ip_range 生成ip list
     输入 "10.99.1.1-3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
+    输入 错误的ip_range  输出 [] 空列表
     """
     if is_ip_range(ip_range):
         input_str_seg1_list = ip_range.split("-")
-        input_str_seg11_list = input_str_seg1_list[0].split(".")  # 取p第4个字节
+        input_str_seg11_list = input_str_seg1_list[0].split(".")  # 取第4个字节
         start_ip_int = ip_or_maskbyte_to_int(input_str_seg1_list[0])
         end_ip_int = start_ip_int + int(input_str_seg1_list[1]) - int(input_str_seg11_list[3])
         ip_list = []
@@ -603,14 +604,14 @@ def generate_ip_list_by_ip_range(ip_range: str) -> list[str]:
         return []
 
 
-def generate_ip_list_by_ip_range_2(ip_range: str) -> list[str]:
+def generate_ip_list_by_ip_range_2(ip_range2: str) -> list[str]:
     """
     根据 ip_range 生成ip list
-    输入 "10.99.1.1-3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
+    输入 "10.99.1.1-10.99.1.3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
     输入 错误的ip_range  输出 [] 空列表
     """
-    if is_ip_range_2(ip_range):
-        input_str_seg1_list = ip_range.split("-")
+    if is_ip_range_2(ip_range2):
+        input_str_seg1_list = ip_range2.split("-")
         start_ip_int = ip_or_maskbyte_to_int(input_str_seg1_list[0])
         end_ip_int = ip_or_maskbyte_to_int(input_str_seg1_list[1])
         ip_list = []
@@ -627,7 +628,7 @@ def ip_to_net_system_id(ip_address: str) -> str:
     输入 "10.99.1.2" 输出 "0100.9900.1002"
     """
     if not is_ip_addr(ip_address):
-        raise TypeError(f"ip_address <{ip_address}> is invalid")
+        raise Exception("不是正确的ip地址:", ip_address)
     ip_seg_list = ip_address.split(".")
     new_ip_seg_list = []
     for ip_seg in ip_seg_list:
@@ -670,10 +671,10 @@ def is_ipv6_addr(input_str: str) -> bool:
                 return False
         return True
     elif len(seg_list) == 2:  # 只有1个 "::" 0位缩写，则全0缩写:: 至少为2个块
-        if seg_list[0] != "" and seg_list[1] != "":  # 例如 FD00:1234::ffff
+        if seg_list[0] != "" and seg_list[1] != "":  # ::左边不为空，右边也不为空的情况，例如 FD00:1234::ffff
             seg_list_head = seg_list[0].split(":")
             seg_list_tail = seg_list[1].split(":")
-            if len(seg_list_head) + len(seg_list_tail) > 6:
+            if len(seg_list_head) + len(seg_list_tail) > 7:  # "FC00:22:33:44::66:77:88"
                 return False
             for ipv6_seg in seg_list_head:
                 try:
@@ -688,7 +689,7 @@ def is_ipv6_addr(input_str: str) -> bool:
                 except ValueError:
                     return False
             return True
-        elif seg_list[0] == "" and seg_list[1] != "":  # 例如 ::ffff
+        elif seg_list[0] == "" and seg_list[1] != "":  # ::左边为空，右边不为空的情况，例如 ::ffff
             seg_list_tail = seg_list[1].split(":")
             if len(seg_list_tail) > 6:
                 return False
@@ -699,7 +700,7 @@ def is_ipv6_addr(input_str: str) -> bool:
                 except ValueError:
                     return False
             return True
-        elif seg_list[0] != "" and seg_list[1] == "":  # 例如 FD00::
+        elif seg_list[0] != "" and seg_list[1] == "":  # ::左边不为空，右边为空的情况，例如 FD00::
             seg_list_head = seg_list[0].split(":")
             if len(seg_list_head) > 6:
                 return False
@@ -710,7 +711,7 @@ def is_ipv6_addr(input_str: str) -> bool:
                 except ValueError:
                     return False
             return True
-        else:  # :: 的情况（全0）
+        else:  # :: 左右都为空的情况（全0）
             return True
     else:
         return False
