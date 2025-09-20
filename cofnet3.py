@@ -128,11 +128,12 @@ def is_netseg_with_maskbyte(netseg: str, maskbyte: str) -> bool:
         return False
     if not is_maskbyte(maskbyte):
         return False
-    netseg_int_of_calc = get_netseg_int(netseg, maskbyte)
-    if netseg_int_of_calc != ip_or_maskbyte_to_int(netseg):
-        return False
-    else:
-        return True
+    return is_cidr(netseg + f"/{maskbyte_to_maskint(maskbyte)}")
+    # netseg_int_of_calc = get_netseg_int(netseg, maskbyte)
+    # if netseg_int_of_calc != ip_or_maskbyte_to_int(netseg):
+    #    return False
+    # else:
+    #    return True
 
 
 def is_ip_with_maskint(input_str: str) -> bool:
@@ -549,17 +550,20 @@ def is_ip_in_net_maskbyte(ip: str, netseg: str, maskbyte: str) -> bool:
     输入 "10.99.3.1","10.99.1.0","255.255.255.0"  输出 False
     ★若输入格式有误则返回False，且不会报错
     """
-    if not is_ip_addr(ip):
-        # raise Exception("不是正确的ip地址,E1", ip)
-        return False
-    if not is_netseg_with_maskbyte(netseg, maskbyte):
-        # raise Exception("不是正确的网段及子网掩码,E2", netseg, maskbyte)
-        return False
-    netseg_int_of_ip = get_netseg_int(ip, maskbyte)
-    netseg_int_of_cidr = get_netseg_int(netseg, maskbyte)
-    if netseg_int_of_ip == netseg_int_of_cidr:
-        return True
-    else:
+    # if not is_ip_addr(ip):
+    #    # raise Exception("不是正确的ip地址,E1", ip)
+    #    return False
+    # if not is_netseg_with_maskbyte(netseg, maskbyte):
+    #    # raise Exception("不是正确的网段及子网掩码,E2", netseg, maskbyte)
+    #    return False
+    try:
+        netseg_int_of_ip = get_netseg_int(ip, maskbyte)
+        netseg_int_of_cidr = get_netseg_int(netseg, maskbyte)
+        if netseg_int_of_ip == netseg_int_of_cidr:
+            return True
+        else:
+            return False
+    except Exception:
         return False
 
 
@@ -591,16 +595,17 @@ def generate_ip_list_by_ip_range(ip_range: str) -> list[str]:
     输入 "10.99.1.1-3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
     输入 错误的ip_range  输出 [] 空列表
     """
-    if is_ip_range(ip_range):
+    # if is_ip_range(ip_range):
+    try:
         input_str_seg1_list = ip_range.split("-")
         input_str_seg11_list = input_str_seg1_list[0].split(".")  # 取第4个字节
         start_ip_int = ip_or_maskbyte_to_int(input_str_seg1_list[0])
         end_ip_int = start_ip_int + int(input_str_seg1_list[1]) - int(input_str_seg11_list[3])
-        ip_list = []
-        for ip_int in range(start_ip_int, end_ip_int + 1):
-            ip_list.append(int32_to_ip(ip_int))
-        return ip_list
-    else:
+        # ip_list = []
+        # for ip_int in range(start_ip_int, end_ip_int + 1):
+        #    ip_list.append(int32_to_ip(ip_int))
+        return [int32_to_ip(ip_int) for ip_int in range(start_ip_int, end_ip_int + 1)]
+    except Exception:
         return []
 
 
@@ -610,7 +615,8 @@ def generate_ip_list_by_ip_range_2(ip_range2: str) -> list[str]:
     输入 "10.99.1.1-10.99.1.3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
     输入 错误的ip_range  输出 [] 空列表
     """
-    if is_ip_range_2(ip_range2):
+    # if is_ip_range_2(ip_range2):
+    try:
         input_str_seg1_list = ip_range2.split("-")
         start_ip_int = ip_or_maskbyte_to_int(input_str_seg1_list[0])
         end_ip_int = ip_or_maskbyte_to_int(input_str_seg1_list[1])
@@ -618,7 +624,7 @@ def generate_ip_list_by_ip_range_2(ip_range2: str) -> list[str]:
         for ip_int in range(start_ip_int, end_ip_int + 1):
             ip_list.append(int32_to_ip(ip_int))
         return ip_list
-    else:
+    except Exception:
         return []
 
 
