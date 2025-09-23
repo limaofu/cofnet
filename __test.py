@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     ip_int_list = [random.randint(0, 0xFFFFFFFF) for _ in range(1000000)]
     start_time = time.time()
-    for ip_int in ip_int_list:  # 100万个ip的计算量，用时如下：
+    for ip_int in ip_int_list:  # 100万个ip的计算量，win10-py3.9 用时如下：
         ip_address = cofnet.int32_to_ip(ip_int)  # 1.0 秒
         #
         try:
