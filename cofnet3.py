@@ -589,7 +589,7 @@ def is_ip_in_range(targetip: str, start_ip: str, end_ip: str) -> bool:
         return False
 
 
-def generate_ip_list_by_ip_range(ip_range: str) -> list[str]:
+def generate_ip_list_by_ip_range(ip_range: str):
     """
     根据 ip_range 生成ip list
     输入 "10.99.1.1-3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
@@ -609,7 +609,7 @@ def generate_ip_list_by_ip_range(ip_range: str) -> list[str]:
         return []
 
 
-def generate_ip_list_by_ip_range_2(ip_range2: str) -> list[str]:
+def generate_ip_list_by_ip_range_2(ip_range2: str):
     """
     根据 ip_range 生成ip list
     输入 "10.99.1.1-10.99.1.3"  输出 ["10.99.1.1", "10.99.1.2", "10.99.1.3"]
